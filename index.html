@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Flight Board</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 2rem;
+            margin: 0;
+        }
+        .header-controls {
+            margin-bottom: 2rem;
+        }
+        input, button {
+            padding: 12px 16px;
+            font-size: 1rem;
+            font-family: inherit;
+            border: 1px solid #444;
+            background-color: #222;
+            color: white;
+            border-radius: 4px;
+        }
+        input {
+            width: 200px;
+            text-transform: uppercase;
+        }
+        button {
+            background-color: #333;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #444; }
+        
+        /* The Board Layout */
+        .board-header, .flight-row {
+            display: grid;
+            grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; 
+            gap: 3.5rem; 
+            padding: 12px 20px;
+            align-items: center;
+        }
+        .board-header {
+            color: #666;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            border-bottom: 2px solid #222;
+        }
+        .flight-row {
+            font-size: 1.6rem;
+            font-weight: bold;
+            background-color: #050505;
+            margin-top: 8px;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        /* The Split-Flap Character Styling */
+        .flap {
+            background: linear-gradient(to bottom, #222 0%, #151515 50%, #111 50%, #1a1a1a 100%);
+            padding: 8px 14px;
+            border-radius: 4px;
+            border: 1px solid #000;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        /* Visual split line down the middle of a flap row */
+        .flap::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 100%;
+            height: 1px;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Status Custom Colors */
+        .text-green .flap { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.2); }
+        .text-yellow .flap { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.2); }
+        .text-red .flap { color: #f87171; text-shadow: 0 0 8px rgba(248,113,113,0.2); }
+        .text-white .flap { color: #ffffff; }
+    </style>
+</head>
+<body>
+
+    <div class="header-controls">
+        <input type="text" id="flightInput" placeholder="e.g., AS412" value="AS412" />
+        <button onclick="addFlight()">Track Flight</button>
+    </div>
+
+    <div class="board-header">
+        <div>Flight</div>
+        <div>Origin</div>
+        <div>Scheduled</div>
+        <div>ETA</div>
+        <div>Remarks</div>
+    </div>
+
+    <div id="flightBoard">
+        </div>
+
+    <script>
+        // CRITICAL: Replace this string with your Google Apps Script Web App URL from Step 2
+        const PROXY_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL'; 
+
+        async function addFlight() {
+            const flightNum = document.getElementById('flightInput').value.trim().toUpperCase();
+            if (!flightNum) return;
+
+            try {
+                const response = await fetch(`${PROXY_URL}?flight=${flightNum}`);
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    renderFlightRow(data[0], flightNum);
+                } else {
+                    alert("No active flight data found for today.");
+                }
+            } catch (error) {
+                console.error("Error pulling flight data:", error);
+                alert("Failed to fetch flight data. Check your script proxy configuration.");
+            }
+        }
+
+        function renderFlightRow(flight, flightNum) {
+            const board = document.getElementById('flightBoard');
+            const row = document.createElement('div');
+            
+            // Map AeroDataBox local times
+            const scheduledTime = new Date(flight.arrival.scheduledTimeLocal);
+            const estimatedTime = flight.arrival.actualTimeLocal ? new Date(flight.arrival.actualTimeLocal) : scheduledTime;
+            
+            const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            // Calculate operational delay thresholds
+            const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
+            let statusClass = "text-white"; 
+            let remarks = "ON TIME";
+
+            if (timeDiffMinutes < 0) {
+                statusClass = "text-green";
+                remarks = "EARLY";
+            } else if (timeDiffMinutes > 0 && timeDiffMinutes <= 30) {
+                statusClass = "text-yellow";
+                remarks = "DELAYED";
+            } else if (timeDiffMinutes > 30) {
+                statusClass = "text-red";
+                remarks = "LATE";
+            }
+
+            row.className = `flight-row ${statusClass}`;
+            
+            row.innerHTML = `
+                <div class="flap">${flightNum}</div>
+                <div class="flap">${flight.departure.airport.iata || '---'}</div>
+                <div class="flap">${formatTime(scheduledTime)}</div>
+                <div class="flap">${formatTime(estimatedTime)}</div>
+                <div class="flap">${remarks}</div>
+            `;
+            
+            // Add new flights to the top of the board layout
+            board.insertBefore(row, board.firstChild);
+            document.getElementById('flightInput').value = ''; 
+        }
+    </script>
+</body>
+</html>
