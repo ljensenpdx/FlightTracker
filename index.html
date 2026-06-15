@@ -112,26 +112,29 @@
         // Your secure Google Apps Script bridge URL
         const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec'; 
 
-        async function refreshBoard() {
+   async function refreshBoard() {
             document.getElementById('loading').style.display = 'inline-block';
             const board = document.getElementById('flightBoard');
             
             try {
                 const response = await fetch(PROXY_URL);
                 const flights = await response.json();
+                
+                // DEBUG: This will print the raw data to your browser's console
+                console.log("Raw data from sheet:", flights); 
 
-                board.innerHTML = ''; // Clear current board
+                board.innerHTML = ''; 
 
                 if (flights && flights.length > 0) {
                     flights.forEach(data => {
                         renderFlightRow(data.details, data.flightNum);
                     });
                 } else {
-                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights found in spreadsheet.</div>';
+                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights returned.</div>';
                 }
             } catch (error) {
-                console.error("Error pulling flight data:", error);
-                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Failed to connect to Google Sheet.</div>';
+                console.error("Error:", error);
+                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Error: ' + error.message + '</div>';
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
