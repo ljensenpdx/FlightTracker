@@ -1,11 +1,151 @@
-function renderFlightRow(flight, flightNum) {
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Flight Board</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: 'Courier学习', 'Courier New', Courier, monospace;
+            padding: 2rem;
+            margin: 0;
+        }
+        .header-controls {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-family: inherit;
+            border: 1px solid #444;
+            background-color: #222;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        button:hover { background-color: #444; }
+        
+        /* The Board Layout with your requested spacing */
+        .board-header, .flight-row {
+            display: grid;
+            grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; 
+            gap: 3.5rem; 
+            padding: 12px 20px;
+            align-items: center;
+        }
+        .board-header {
+            color: #666;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            border-bottom: 2px solid #222;
+        }
+        .flight-row {
+            font-size: 1.6rem;
+            font-weight: bold;
+            background-color: #050505;
+            margin-top: 8px;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        /* The Split-Flap Character Styling */
+        .flap {
+            background: linear-gradient(to bottom, #222 0%, #151515 50%, #111 50%, #1a1a1a 100%);
+            padding: 8px 14px;
+            border-radius: 4px;
+            border: 1px solid #000;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        .flap::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 100%;
+            height: 1px;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Custom Status Colors */
+        .text-green .flap { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.2); }
+        .text-yellow .flap { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.2); }
+        .text-red .flap { color: #f87171; text-shadow: 0 0 8px rgba(248,113,113,0.2); }
+        .text-white .flap { color: #ffffff; }
+        
+        #loading { display: none; color: #888; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div class="header-controls">
+        <h2 style="margin: 0; color: #888; font-weight: normal;">DEPARTURES & ARRIVALS</h2>
+        <div>
+            <span id="loading">Syncing with Sheet... </span>
+            <button onclick="refreshBoard()">Refresh Board</button>
+        </div>
+    </div>
+
+    <div class="board-header">
+        <div>Flight</div>
+        <div>Origin</div>
+        <div>Scheduled</div>
+        <div>ETA</div>
+        <div>Remarks</div>
+    </div>
+
+    <div id="flightBoard">
+        </div>
+
+    <script>
+        // Your secure Google Apps Script bridge URL
+        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec'; 
+
+        async function refreshBoard() {
+            document.getElementById('loading').style.display = 'inline-block';
             const board = document.getElementById('flightBoard');
-            const row = document.createElement('div');
+            
+            try {
+                const response = await fetch(PROXY_URL);
+                const flights = await response.json();
+
+                board.innerHTML = ''; // Clear current board
+
+                if (flights && flights.length > 0) {
+                    flights.forEach(data => {
+                        renderFlightRow(data.details, data.flightNum);
+                    });
+                } else {
+                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights found in spreadsheet.</div>';
+                }
+            } catch (error) {
+                console.error("Error pulling flight data:", error);
+                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Failed to connect to Google Sheet.</div>';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderFlightRow(flight, flightNum) {
+            const board = document.getElementById('flightBoard');
             
             // Check if arrival data exists to prevent errors on cancelled/unscheduled flights
             if (!flight.arrival || !flight.arrival.scheduledTimeLocal) return;
 
-            // THE FIX: Replace the space with a 'T' so JavaScript can read the date properly
+            const row = document.createElement('div');
+            
+            // Replace the space with a 'T' so JavaScript can read the date properly
             const safeScheduled = flight.arrival.scheduledTimeLocal.replace(' ', 'T');
             const scheduledTime = new Date(safeScheduled);
             
@@ -45,3 +185,9 @@ function renderFlightRow(flight, flightNum) {
             
             board.appendChild(row);
         }
+
+        // Auto-load the board when the page opens
+        window.onload = refreshBoard;
+    </script>
+</body>
+</html>
