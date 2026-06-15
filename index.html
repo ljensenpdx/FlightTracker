@@ -14,29 +14,26 @@
         }
         .header-controls {
             margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        input, button {
-            padding: 12px 16px;
+        button {
+            padding: 12px 24px;
             font-size: 1rem;
             font-family: inherit;
             border: 1px solid #444;
             background-color: #222;
             color: white;
             border-radius: 4px;
-        }
-        input {
-            width: 200px;
-            text-transform: uppercase;
-        }
-        button {
-            background-color: #333;
             cursor: pointer;
-            margin-left: 8px;
             transition: background 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         button:hover { background-color: #444; }
         
-        /* The Board Layout */
+        /* The Board Layout with your requested spacing */
         .board-header, .flight-row {
             display: grid;
             grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; 
@@ -71,7 +68,6 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.6);
             position: relative;
         }
-        /* Visual split line down the middle of a flap row */
         .flap::after {
             content: '';
             position: absolute;
@@ -82,18 +78,23 @@
             background-color: rgba(0, 0, 0, 0.4);
         }
 
-        /* Status Custom Colors */
+        /* Custom Status Colors */
         .text-green .flap { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.2); }
         .text-yellow .flap { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.2); }
         .text-red .flap { color: #f87171; text-shadow: 0 0 8px rgba(248,113,113,0.2); }
         .text-white .flap { color: #ffffff; }
+        
+        #loading { display: none; color: #888; font-style: italic; }
     </style>
 </head>
 <body>
 
     <div class="header-controls">
-        <input type="text" id="flightInput" placeholder="e.g., AS412" value="AS412" />
-        <button onclick="addFlight()">Track Flight</button>
+        <h2 style="margin: 0; color: #888; font-weight: normal;">DEPARTURES & ARRIVALS</h2>
+        <div>
+            <span id="loading">Syncing with Sheet... </span>
+            <button onclick="refreshBoard()">Refresh Board</button>
+        </div>
     </div>
 
     <div class="board-header">
@@ -108,25 +109,31 @@
         </div>
 
     <script>
-        // CRITICAL: Replace this string with your Google Apps Script Web App URL from Step 2
-        const PROXY_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL'; 
+        // Your secure Google Apps Script bridge URL
+        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec'; 
 
-        async function addFlight() {
-            const flightNum = document.getElementById('flightInput').value.trim().toUpperCase();
-            if (!flightNum) return;
-
+        async function refreshBoard() {
+            document.getElementById('loading').style.display = 'inline-block';
+            const board = document.getElementById('flightBoard');
+            
             try {
-                const response = await fetch(`${PROXY_URL}?flight=${flightNum}`);
-                const data = await response.json();
+                const response = await fetch(PROXY_URL);
+                const flights = await response.json();
 
-                if (data && data.length > 0) {
-                    renderFlightRow(data[0], flightNum);
+                board.innerHTML = ''; // Clear current board
+
+                if (flights && flights.length > 0) {
+                    flights.forEach(data => {
+                        renderFlightRow(data.details, data.flightNum);
+                    });
                 } else {
-                    alert("No active flight data found for today.");
+                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights found in spreadsheet.</div>';
                 }
             } catch (error) {
                 console.error("Error pulling flight data:", error);
-                alert("Failed to fetch flight data. Check your script proxy configuration.");
+                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Failed to connect to Google Sheet.</div>';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
             }
         }
 
@@ -166,10 +173,11 @@
                 <div class="flap">${remarks}</div>
             `;
             
-            // Add new flights to the top of the board layout
-            board.insertBefore(row, board.firstChild);
-            document.getElementById('flightInput').value = ''; 
+            board.appendChild(row);
         }
+
+        // Auto-load the board when the page opens
+        window.onload = refreshBoard;
     </script>
 </body>
 </html>
