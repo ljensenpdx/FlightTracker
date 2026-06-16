@@ -140,23 +140,59 @@
             }
         }
 
-        function renderFlightRow(flight, flightNum) {
+      function renderFlightRow(flight, flightNum) {
             const board = document.getElementById('flightBoard');
             
-            // Check if arrival data exists to prevent errors on cancelled/unscheduled flights
-            if (!flight.arrival || !flight.arrival.scheduledTimeLocal) return;
+            // 1. Safety check for the specific structure you provided
+            if (!flight || !flight.arrival) return;
 
             const row = document.createElement('div');
             
-            // Replace the space with a 'T' so JavaScript can read the date properly
-            const safeScheduled = flight.arrival.scheduledTimeLocal.replace(' ', 'T');
+            // 2. Extract dates from your specific JSON format
+            // Your JSON uses 'local' or 'utc' inside 'scheduledTime'
+            const scheduledRaw = flight.arrival.scheduledTime ? flight.arrival.scheduledTime.local : null;
+            if (!scheduledRaw) return;
+
+            const safeScheduled = scheduledRaw.replace(' ', 'T');
             const scheduledTime = new Date(safeScheduled);
             
+            // 3. Handle ETA
             let estimatedTime = scheduledTime;
-            if (flight.arrival.actualTimeLocal) {
-                const safeEstimated = flight.arrival.actualTimeLocal.replace(' ', 'T');
+            if (flight.arrival.predictedTime && flight.arrival.predictedTime.local) {
+                const safeEstimated = flight.arrival.predictedTime.local.replace(' ', 'T');
                 estimatedTime = new Date(safeEstimated);
             }
+            
+            const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            // 4. Time logic (remains the same)
+            const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
+            let statusClass = "text-white"; 
+            let remarks = "ON TIME";
+
+            if (timeDiffMinutes < 0) {
+                statusClass = "text-green";
+                remarks = "EARLY";
+            } else if (timeDiffMinutes > 0 && timeDiffMinutes <= 30) {
+                statusClass = "text-yellow";
+                remarks = "DELAYED";
+            } else if (timeDiffMinutes > 30) {
+                statusClass = "text-red";
+                remarks = "LATE";
+            }
+
+            row.className = `flight-row ${statusClass}`;
+            
+            row.innerHTML = `
+                <div class="flap">${flightNum}</div>
+                <div class="flap">${flight.departure.airport.iata || '---'}</div>
+                <div class="flap">${formatTime(scheduledTime)}</div>
+                <div class="flap">${formatTime(estimatedTime)}</div>
+                <div class="flap">${remarks}</div>
+            `;
+            
+            board.appendChild(row);
+        }
             
             const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
