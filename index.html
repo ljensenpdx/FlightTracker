@@ -18,20 +18,28 @@
             justify-content: space-between;
             align-items: center;
         }
+        input {
+            padding: 10px;
+            background: #222;
+            border: 1px solid #444;
+            color: white;
+            text-transform: uppercase;
+        }
         button {
-            padding: 12px 24px;
+            padding: 10px 20px;
             font-size: 1rem;
             font-family: inherit;
             border: 1px solid #444;
-            background-color: #222;
+            background-color: #333;
             color: white;
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.2s;
             text-transform: uppercase;
             letter-spacing: 1px;
+            margin-left: 5px;
         }
-        button:hover { background-color: #444; }
+        button:hover { background-color: #555; }
         
         .board-header, .flight-row {
             display: grid;
@@ -87,10 +95,12 @@
 <body>
 
     <div class="header-controls">
-        <h2 style="margin: 0; color: #888; font-weight: normal;">DEPARTURES & ARRIVALS</h2>
+        <h2 style="margin: 0; color: #888; font-weight: normal;">ARRIVAL BOARD (CT)</h2>
         <div>
-            <span id="loading">Syncing with Sheet... </span>
-            <button onclick="refreshBoard()">Refresh Board</button>
+            <span id="loading">Syncing... </span>
+            <input type="text" id="newFlight" placeholder="Enter Flight (e.g. AA2047)">
+            <button onclick="addAndRefresh()">TRACK</button>
+            <button onclick="refreshBoard()">REFRESH</button>
         </div>
     </div>
 
@@ -102,11 +112,19 @@
         <div>Remarks</div>
     </div>
 
-    <div id="flightBoard">
-        </div>
+    <div id="flightBoard"></div>
 
     <script>
         const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec'; 
+
+        async function addAndRefresh() {
+            const flight = document.getElementById('newFlight').value;
+            if (!flight) return;
+            
+            await fetch(`${PROXY_URL}?add=${flight}`);
+            document.getElementById('newFlight').value = '';
+            refreshBoard();
+        }
 
         async function refreshBoard() {
             document.getElementById('loading').style.display = 'inline-block';
@@ -115,69 +133,54 @@
             try {
                 const response = await fetch(PROXY_URL);
                 const flights = await response.json();
-
                 board.innerHTML = ''; 
 
                 if (flights && flights.length > 0) {
-                    flights.forEach(data => {
-                        renderFlightRow(data.details, data.flightNum);
-                    });
+                    flights.forEach(data => renderFlightRow(data.details, data.flightNum));
                 } else {
-                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights found in spreadsheet.</div>';
+                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights in sheet.</div>';
                 }
             } catch (error) {
-                console.error("Error:", error);
-                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Failed to connect to backend.</div>';
+                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Error connecting to backend.</div>';
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
         }
 
         function renderFlightRow(flight, flightNum) {
-            const board = document.getElementById('flightBoard');
-            
             if (!flight || !flight.arrival || !flight.arrival.scheduledTime) return;
 
             const row = document.createElement('div');
             
-            // Extract dates from AeroDataBox nested structure
-            const scheduledRaw = flight.arrival.scheduledTime.local.replace(' ', 'T');
-            const scheduledTime = new Date(scheduledRaw);
-            
+            const scheduledTime = new Date(flight.arrival.scheduledTime.local.replace(' ', 'T'));
             let estimatedTime = scheduledTime;
             if (flight.arrival.predictedTime && flight.arrival.predictedTime.local) {
-                const predictedRaw = flight.arrival.predictedTime.local.replace(' ', 'T');
-                estimatedTime = new Date(predictedRaw);
+                estimatedTime = new Date(flight.arrival.predictedTime.local.replace(' ', 'T'));
             }
             
-            const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            // Format time specifically for Central Time (CT)
+            const formatTimeCT = (date) => date.toLocaleTimeString('en-US', { 
+                timeZone: 'America/Chicago', 
+                hour: '2-digit', minute: '2-digit', hour12: false 
+            });
 
             const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
             let statusClass = "text-white"; 
             let remarks = "ON TIME";
 
-            if (timeDiffMinutes < -1) {
-                statusClass = "text-green";
-                remarks = "EARLY";
-            } else if (timeDiffMinutes > 1 && timeDiffMinutes <= 30) {
-                statusClass = "text-yellow";
-                remarks = "DELAYED";
-            } else if (timeDiffMinutes > 30) {
-                statusClass = "text-red";
-                remarks = "LATE";
-            }
+            if (timeDiffMinutes < -1) { statusClass = "text-green"; remarks = "EARLY"; }
+            else if (timeDiffMinutes > 1 && timeDiffMinutes <= 30) { statusClass = "text-yellow"; remarks = "DELAYED"; }
+            else if (timeDiffMinutes > 30) { statusClass = "text-red"; remarks = "LATE"; }
 
             row.className = `flight-row ${statusClass}`;
-            
             row.innerHTML = `
                 <div class="flap">${flightNum}</div>
                 <div class="flap">${flight.departure.airport.iata || '---'}</div>
-                <div class="flap">${formatTime(scheduledTime)}</div>
-                <div class="flap">${formatTime(estimatedTime)}</div>
+                <div class="flap">${formatTimeCT(scheduledTime)}</div>
+                <div class="flap">${formatTimeCT(estimatedTime)}</div>
                 <div class="flap">${remarks}</div>
             `;
-            
-            board.appendChild(row);
+            document.getElementById('flightBoard').appendChild(row);
         }
 
         window.onload = refreshBoard;
