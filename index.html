@@ -152,17 +152,20 @@
 
             const row = document.createElement('div');
             
+            // Dates Parsing
             const scheduledTime = new Date(flight.arrival.scheduledTime.local.replace(' ', 'T'));
             let estimatedTime = scheduledTime;
             if (flight.arrival.predictedTime && flight.arrival.predictedTime.local) {
                 estimatedTime = new Date(flight.arrival.predictedTime.local.replace(' ', 'T'));
             }
             
-            // Format time specifically for Central Time (CT)
-            const formatTimeCT = (date) => date.toLocaleTimeString('en-US', { 
-                timeZone: 'America/Chicago', 
-                hour: '2-digit', minute: '2-digit', hour12: false 
-            });
+            // "Bulletproof" Central Time Formatting
+            const formatTimeCT = (date) => {
+                return date.toLocaleTimeString('en-US', { 
+                    timeZone: 'America/Chicago', 
+                    hour: '2-digit', minute: '2-digit', hour12: false 
+                });
+            };
 
             const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
             let statusClass = "text-white"; 
