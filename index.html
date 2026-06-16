@@ -8,7 +8,7 @@
         body {
             background-color: #111;
             color: #fff;
-            font-family: 'Courier学习', 'Courier New', Courier, monospace;
+            font-family: 'Courier New', Courier, monospace;
             padding: 2rem;
             margin: 0;
         }
@@ -33,7 +33,6 @@
         }
         button:hover { background-color: #444; }
         
-        /* The Board Layout with your requested spacing */
         .board-header, .flight-row {
             display: grid;
             grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; 
@@ -58,7 +57,6 @@
             box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
         }
 
-        /* The Split-Flap Character Styling */
         .flap {
             background: linear-gradient(to bottom, #222 0%, #151515 50%, #111 50%, #1a1a1a 100%);
             padding: 8px 14px;
@@ -78,10 +76,9 @@
             background-color: rgba(0, 0, 0, 0.4);
         }
 
-        /* Custom Status Colors */
-        .text-green .flap { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.2); }
-        .text-yellow .flap { color: #facc15; text-shadow: 0 0 8px rgba(250,204,21,0.2); }
-        .text-red .flap { color: #f87171; text-shadow: 0 0 8px rgba(248,113,113,0.2); }
+        .text-green .flap { color: #4ade80; }
+        .text-yellow .flap { color: #facc15; }
+        .text-red .flap { color: #f87171; }
         .text-white .flap { color: #ffffff; }
         
         #loading { display: none; color: #888; font-style: italic; }
@@ -109,19 +106,15 @@
         </div>
 
     <script>
-        // Your secure Google Apps Script bridge URL
         const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec'; 
 
-   async function refreshBoard() {
+        async function refreshBoard() {
             document.getElementById('loading').style.display = 'inline-block';
             const board = document.getElementById('flightBoard');
             
             try {
                 const response = await fetch(PROXY_URL);
                 const flights = await response.json();
-                
-                // DEBUG: This will print the raw data to your browser's console
-                console.log("Raw data from sheet:", flights); 
 
                 board.innerHTML = ''; 
 
@@ -130,81 +123,43 @@
                         renderFlightRow(data.details, data.flightNum);
                     });
                 } else {
-                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights returned.</div>';
+                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights found in spreadsheet.</div>';
                 }
             } catch (error) {
                 console.error("Error:", error);
-                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Error: ' + error.message + '</div>';
+                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Failed to connect to backend.</div>';
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
         }
 
-      function renderFlightRow(flight, flightNum) {
+        function renderFlightRow(flight, flightNum) {
             const board = document.getElementById('flightBoard');
             
-            // 1. Safety check for the specific structure you provided
-            if (!flight || !flight.arrival) return;
+            if (!flight || !flight.arrival || !flight.arrival.scheduledTime) return;
 
             const row = document.createElement('div');
             
-            // 2. Extract dates from your specific JSON format
-            // Your JSON uses 'local' or 'utc' inside 'scheduledTime'
-            const scheduledRaw = flight.arrival.scheduledTime ? flight.arrival.scheduledTime.local : null;
-            if (!scheduledRaw) return;
-
-            const safeScheduled = scheduledRaw.replace(' ', 'T');
-            const scheduledTime = new Date(safeScheduled);
+            // Extract dates from AeroDataBox nested structure
+            const scheduledRaw = flight.arrival.scheduledTime.local.replace(' ', 'T');
+            const scheduledTime = new Date(scheduledRaw);
             
-            // 3. Handle ETA
             let estimatedTime = scheduledTime;
             if (flight.arrival.predictedTime && flight.arrival.predictedTime.local) {
-                const safeEstimated = flight.arrival.predictedTime.local.replace(' ', 'T');
-                estimatedTime = new Date(safeEstimated);
+                const predictedRaw = flight.arrival.predictedTime.local.replace(' ', 'T');
+                estimatedTime = new Date(predictedRaw);
             }
             
             const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-            // 4. Time logic (remains the same)
             const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
             let statusClass = "text-white"; 
             let remarks = "ON TIME";
 
-            if (timeDiffMinutes < 0) {
+            if (timeDiffMinutes < -1) {
                 statusClass = "text-green";
                 remarks = "EARLY";
-            } else if (timeDiffMinutes > 0 && timeDiffMinutes <= 30) {
-                statusClass = "text-yellow";
-                remarks = "DELAYED";
-            } else if (timeDiffMinutes > 30) {
-                statusClass = "text-red";
-                remarks = "LATE";
-            }
-
-            row.className = `flight-row ${statusClass}`;
-            
-            row.innerHTML = `
-                <div class="flap">${flightNum}</div>
-                <div class="flap">${flight.departure.airport.iata || '---'}</div>
-                <div class="flap">${formatTime(scheduledTime)}</div>
-                <div class="flap">${formatTime(estimatedTime)}</div>
-                <div class="flap">${remarks}</div>
-            `;
-            
-            board.appendChild(row);
-        }
-            
-            const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-            // Calculate operational delay thresholds
-            const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
-            let statusClass = "text-white"; 
-            let remarks = "ON TIME";
-
-            if (timeDiffMinutes < 0) {
-                statusClass = "text-green";
-                remarks = "EARLY";
-            } else if (timeDiffMinutes > 0 && timeDiffMinutes <= 30) {
+            } else if (timeDiffMinutes > 1 && timeDiffMinutes <= 30) {
                 statusClass = "text-yellow";
                 remarks = "DELAYED";
             } else if (timeDiffMinutes > 30) {
@@ -225,7 +180,6 @@
             board.appendChild(row);
         }
 
-        // Auto-load the board when the page opens
         window.onload = refreshBoard;
     </script>
 </body>
