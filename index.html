@@ -2,190 +2,85 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Flight Board</title>
     <style>
-        body {
-            background-color: #111;
-            color: #fff;
-            font-family: 'Courier New', Courier, monospace;
-            padding: 2rem;
-            margin: 0;
-        }
-        .header-controls {
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        input {
-            padding: 10px;
-            background: #222;
-            border: 1px solid #444;
-            color: white;
-            text-transform: uppercase;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 1rem;
-            font-family: inherit;
-            border: 1px solid #444;
-            background-color: #333;
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-left: 5px;
-        }
+        body { background-color: #111; color: #fff; font-family: 'Courier New', monospace; padding: 2rem; margin: 0; }
+        .header-controls { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
+        input { padding: 10px; background: #222; border: 1px solid #444; color: white; text-transform: uppercase; }
+        button { padding: 10px 20px; font-family: inherit; border: 1px solid #444; background-color: #333; color: white; cursor: pointer; text-transform: uppercase; margin-left: 5px; }
         button:hover { background-color: #555; }
-        
-        .board-header, .flight-row {
-            display: grid;
-            grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; 
-            gap: 3.5rem; 
-            padding: 12px 20px;
-            align-items: center;
-        }
-        .board-header {
-            color: #666;
-            text-transform: uppercase;
-            font-size: 0.9rem;
-            letter-spacing: 2px;
-            border-bottom: 2px solid #222;
-        }
-        .flight-row {
-            font-size: 1.6rem;
-            font-weight: bold;
-            background-color: #050505;
-            margin-top: 8px;
-            border: 1px solid #1a1a1a;
-            border-radius: 4px;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
-        }
-
-        .flap {
-            background: linear-gradient(to bottom, #222 0%, #151515 50%, #111 50%, #1a1a1a 100%);
-            padding: 8px 14px;
-            border-radius: 4px;
-            border: 1px solid #000;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.6);
-            position: relative;
-        }
-        .flap::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            width: 100%;
-            height: 1px;
-            background-color: rgba(0, 0, 0, 0.4);
-        }
-
-        .text-green .flap { color: #4ade80; }
-        .text-yellow .flap { color: #facc15; }
-        .text-red .flap { color: #f87171; }
-        .text-white .flap { color: #ffffff; }
-        
-        #loading { display: none; color: #888; font-style: italic; }
+        .board-header, .flight-row { display: grid; grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; gap: 3.5rem; padding: 12px 20px; align-items: center; }
+        .board-header { color: #666; border-bottom: 2px solid #222; }
+        .flight-row { font-size: 1.6rem; font-weight: bold; background-color: #050505; margin-top: 8px; border: 1px solid #1a1a1a; }
+        .flap { background: linear-gradient(to bottom, #222 0%, #151515 50%, #111 50%, #1a1a1a 100%); padding: 8px 14px; border-radius: 4px; text-align: center; }
+        .text-green .flap { color: #4ade80; } .text-yellow .flap { color: #facc15; } .text-red .flap { color: #f87171; } .text-white .flap { color: #ffffff; }
     </style>
 </head>
 <body>
-
     <div class="header-controls">
-        <h2 style="margin: 0; color: #888; font-weight: normal;">ARRIVAL BOARD (CT)</h2>
+        <h2>ARRIVAL BOARD (CT)</h2>
         <div>
-            <span id="loading">Syncing... </span>
-            <input type="text" id="newFlight" placeholder="Enter Flight (e.g. AA2047)">
-            <button onclick="addAndRefresh()">TRACK</button>
+            <input type="text" id="newFlight" placeholder="Enter Flight">
+            <button onclick="trackFlight()">TRACK</button>
+            <button onclick="clearAll()">CLEAR ALL</button>
             <button onclick="refreshBoard()">REFRESH</button>
         </div>
     </div>
-
-    <div class="board-header">
-        <div>Flight</div>
-        <div>Origin</div>
-        <div>Scheduled</div>
-        <div>ETA</div>
-        <div>Remarks</div>
-    </div>
-
+    <div class="board-header"><div>Flight</div><div>Origin</div><div>Scheduled</div><div>ETA</div><div>Remarks</div></div>
     <div id="flightBoard"></div>
 
     <script>
-        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec'; 
+        const PROXY_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
 
-        async function addAndRefresh() {
-            const flight = document.getElementById('newFlight').value;
+        function trackFlight() {
+            const flight = document.getElementById('newFlight').value.toUpperCase();
             if (!flight) return;
-            
-            await fetch(`${PROXY_URL}?add=${flight}`);
+            let flights = JSON.parse(localStorage.getItem('myFlights') || '[]');
+            if (!flights.includes(flight)) {
+                flights.push(flight);
+                localStorage.setItem('myFlights', JSON.stringify(flights));
+            }
             document.getElementById('newFlight').value = '';
             refreshBoard();
         }
 
-        async function refreshBoard() {
-            document.getElementById('loading').style.display = 'inline-block';
-            const board = document.getElementById('flightBoard');
-            
-            try {
-                const response = await fetch(PROXY_URL);
-                const flights = await response.json();
-                board.innerHTML = ''; 
+        function clearAll() {
+            localStorage.removeItem('myFlights');
+            document.getElementById('flightBoard').innerHTML = '';
+        }
 
-                if (flights && flights.length > 0) {
-                    flights.forEach(data => renderFlightRow(data.details, data.flightNum));
-                } else {
-                    board.innerHTML = '<div style="padding: 20px; color: #666;">No active flights in sheet.</div>';
-                }
-            } catch (error) {
-                board.innerHTML = '<div style="padding: 20px; color: #f87171;">Error connecting to backend.</div>';
-            } finally {
-                document.getElementById('loading').style.display = 'none';
+        async function refreshBoard() {
+            const board = document.getElementById('flightBoard');
+            const flightList = JSON.parse(localStorage.getItem('myFlights') || '[]');
+            board.innerHTML = '';
+
+            for (const flightNum of flightList) {
+                try {
+                    const response = await fetch(`${PROXY_URL}?flight=${flightNum}`);
+                    const data = await response.json();
+                    if (data && data.length > 0) renderFlightRow(data[0].details, flightNum);
+                } catch (e) { console.error(e); }
             }
         }
 
         function renderFlightRow(flight, flightNum) {
-            if (!flight || !flight.arrival || !flight.arrival.scheduledTime) return;
-
-            const row = document.createElement('div');
+            const scheduled = new Date(flight.arrival.scheduledTime.local.replace(' ', 'T'));
+            const eta = flight.arrival.predictedTime ? new Date(flight.arrival.predictedTime.local.replace(' ', 'T')) : scheduled;
+            const format = (d) => d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false });
             
-            // Dates Parsing
-            const scheduledTime = new Date(flight.arrival.scheduledTime.local.replace(' ', 'T'));
-            let estimatedTime = scheduledTime;
-            if (flight.arrival.predictedTime && flight.arrival.predictedTime.local) {
-                estimatedTime = new Date(flight.arrival.predictedTime.local.replace(' ', 'T'));
-            }
-            
-            // "Bulletproof" Central Time Formatting
-            const formatTimeCT = (date) => {
-                return date.toLocaleTimeString('en-US', { 
-                    timeZone: 'America/Chicago', 
-                    hour: '2-digit', minute: '2-digit', hour12: false 
-                });
-            };
+            const diff = (eta - scheduled) / 60000;
+            let status = diff < -1 ? 'text-green' : (diff > 1 ? 'text-yellow' : 'text-white');
+            let remark = diff < -1 ? 'EARLY' : (diff > 1 ? 'DELAYED' : 'ON TIME');
 
-            const timeDiffMinutes = (estimatedTime - scheduledTime) / (1000 * 60);
-            let statusClass = "text-white"; 
-            let remarks = "ON TIME";
-
-            if (timeDiffMinutes < -1) { statusClass = "text-green"; remarks = "EARLY"; }
-            else if (timeDiffMinutes > 1 && timeDiffMinutes <= 30) { statusClass = "text-yellow"; remarks = "DELAYED"; }
-            else if (timeDiffMinutes > 30) { statusClass = "text-red"; remarks = "LATE"; }
-
-            row.className = `flight-row ${statusClass}`;
-            row.innerHTML = `
-                <div class="flap">${flightNum}</div>
-                <div class="flap">${flight.departure.airport.iata || '---'}</div>
-                <div class="flap">${formatTimeCT(scheduledTime)}</div>
-                <div class="flap">${formatTimeCT(estimatedTime)}</div>
-                <div class="flap">${remarks}</div>
-            `;
-            document.getElementById('flightBoard').appendChild(row);
+            document.getElementById('flightBoard').innerHTML += `
+                <div class="flight-row ${status}">
+                    <div class="flap">${flightNum}</div>
+                    <div class="flap">${flight.departure.airport.iata}</div>
+                    <div class="flap">${format(scheduled)}</div>
+                    <div class="flap">${format(eta)}</div>
+                    <div class="flap">${remark}</div>
+                </div>`;
         }
-
         window.onload = refreshBoard;
     </script>
 </body>
