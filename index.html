@@ -30,18 +30,20 @@
     <div id="flightBoard"></div>
 
     <script>
-        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec';
+        const PROXY_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
 
-        function trackFlight() {
-            const flight = document.getElementById('newFlight').value.toUpperCase();
+        async function trackFlight() {
+            const input = document.getElementById('newFlight');
+            const flight = input.value.toUpperCase().trim();
             if (!flight) return;
+            
             let flights = JSON.parse(localStorage.getItem('myFlights') || '[]');
             if (!flights.includes(flight)) {
                 flights.push(flight);
                 localStorage.setItem('myFlights', JSON.stringify(flights));
             }
-            document.getElementById('newFlight').value = '';
-            refreshBoard();
+            input.value = '';
+            await refreshBoard();
         }
 
         function clearAll() {
@@ -52,27 +54,34 @@
         async function refreshBoard() {
             const board = document.getElementById('flightBoard');
             const flightList = JSON.parse(localStorage.getItem('myFlights') || '[]');
-            board.innerHTML = '';
+            board.innerHTML = 'Updating...';
 
             for (const flightNum of flightList) {
                 try {
+                    // Added await here to fix the Promise pending issue
                     const response = await fetch(`${PROXY_URL}?flight=${flightNum}`);
                     const data = await response.json();
-                    if (data && data.length > 0) renderFlightRow(data[0].details, flightNum);
-                } catch (e) { console.error(e); }
+                    
+                    if (data && data.length > 0) {
+                        renderFlightRow(data[0].details, flightNum);
+                    }
+                } catch (e) { console.error("Fetch error:", e); }
             }
+            if(flightList.length === 0) board.innerHTML = '';
         }
 
         function renderFlightRow(flight, flightNum) {
             const scheduled = new Date(flight.arrival.scheduledTime.local.replace(' ', 'T'));
             const eta = flight.arrival.predictedTime ? new Date(flight.arrival.predictedTime.local.replace(' ', 'T')) : scheduled;
+            
             const format = (d) => d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false });
             
             const diff = (eta - scheduled) / 60000;
             let status = diff < -1 ? 'text-green' : (diff > 1 ? 'text-yellow' : 'text-white');
             let remark = diff < -1 ? 'EARLY' : (diff > 1 ? 'DELAYED' : 'ON TIME');
 
-            document.getElementById('flightBoard').innerHTML += `
+            const board = document.getElementById('flightBoard');
+            board.innerHTML += `
                 <div class="flight-row ${status}">
                     <div class="flap">${flightNum}</div>
                     <div class="flap">${flight.departure.airport.iata}</div>
