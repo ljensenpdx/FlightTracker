@@ -16,36 +16,44 @@
 </head>
 <body>
     <div class="header-controls">
-        <select id="airlineSelect">
+        <select id="airlineSelect" onchange="updatePlaceholder()">
             <option value="AA">American (AA)</option>
             <option value="WN">Southwest (WN)</option>
             <option value="UA">United (UA)</option>
             <option value="DL">Delta (DL)</option>
             <option value="AS">Alaska (AS)</option>
             <option value="B6">JetBlue (B6)</option>
+            <option value="PRIVATE">Private (N-Number)</option>
         </select>
         <input type="text" id="flightNum" placeholder="Flight Number (e.g. 3748)">
-        <button onclick="trackFlight()">TRACK MCI ARRIVAL</button>
+        <button onclick="trackFlight()">TRACK</button>
         <button onclick="clearAll()">CLEAR</button>
         <button onclick="refreshBoard()">REFRESH</button>
     </div>
 
-    <div class="board-header"><div>Flight</div><div>ORIGIN</div><div>Scheduled</div><div>ETA</div><div>Status</div></div>
+    <div class="board-header"><div>ID</div><div>Origin</div><div>Scheduled</div><div>ETA</div><div>Status</div></div>
     <div id="flightBoard"></div>
 
     <script>
-        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbz-mFHDPIocQf-ri9G-AH-KXroNa7S5pHyNZkGMCEZhb255777K6GtVxolF4iHaaFa3kw/exec';
+        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbw12Zdm8lHgnAbDDpvuHlkbwR1lZPLHphv45Jo-GtjpAG6YYtR2Jd5zXwwLh_TQtYIPIg/exec';
+
+        function updatePlaceholder() {
+            const type = document.getElementById('airlineSelect').value;
+            const input = document.getElementById('flightNum');
+            input.placeholder = (type === 'PRIVATE') ? "Enter Tail (e.g. N123AK)" : "Flight Number (e.g. 3748)";
+        }
 
         async function trackFlight() {
-            const airline = document.getElementById('airlineSelect').value;
+            const type = document.getElementById('airlineSelect').value;
             const number = document.getElementById('flightNum').value.trim();
             if (!number) return;
             
-            const fullFlight = airline + number;
+            const identifier = (type === 'PRIVATE') ? number : (type + number);
             let flights = JSON.parse(localStorage.getItem('myFlights') || '[]');
             
-            if (!flights.includes(fullFlight)) {
-                flights.push(fullFlight);
+            const entry = { id: identifier, type: type };
+            if (!flights.find(f => f.id === identifier)) {
+                flights.push(entry);
                 localStorage.setItem('myFlights', JSON.stringify(flights));
             }
             document.getElementById('flightNum').value = '';
@@ -57,20 +65,22 @@
             const flightList = JSON.parse(localStorage.getItem('myFlights') || '[]');
             board.innerHTML = '';
             
-            for (const f of flightList) {
+            for (const item of flightList) {
                 try {
-                    const res = await fetch(`${PROXY_URL}?flight=${f}`);
+                    const res = await fetch(`${PROXY_URL}?flight=${item.id}&type=${item.type}`);
                     const data = await res.json();
                     if (data && data.length > 0) {
-                        data.forEach(leg => renderRow(leg, f));
+                        data.forEach(leg => renderRow(leg, item.id));
                     }
                 } catch(e) { console.error("Refresh error:", e); }
             }
         }
 
-function renderRow(f, num) {
-            const sched = new Date(f.arrival.scheduledTime.local.replace(' ', 'T'));
-            const eta = f.arrival.predictedTime ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
+        function renderRow(f, id) {
+            // Handle differences in JSON structure for Private vs Commercial
+            const sched = f.arrival?.scheduledTime?.local ? new Date(f.arrival.scheduledTime.local.replace(' ', 'T')) : new Date();
+            const eta = f.arrival?.predictedTime?.local ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
+            const origin = f.departure?.airport?.iata || "---";
             
             const fmt = (d) => d.toLocaleTimeString('en-US', { 
                 timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false 
@@ -79,8 +89,9 @@ function renderRow(f, num) {
             const isDelayed = eta > sched;
             document.getElementById('flightBoard').innerHTML += `
                 <div class="flight-row" style="color: ${isDelayed ? '#f87171' : '#fff'}">
-                    <div class="flap">${num}</div>
-                    <div class="flap">${f.departure.airport.iata}</div> <div class="flap">${fmt(sched)}</div>
+                    <div class="flap">${id}</div>
+                    <div class="flap">${origin}</div>
+                    <div class="flap">${fmt(sched)}</div>
                     <div class="flap">${fmt(eta)}</div>
                     <div class="flap">${isDelayed ? 'DELAYED' : 'ON TIME'}</div>
                 </div>`;
