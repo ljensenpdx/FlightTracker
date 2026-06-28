@@ -17,21 +17,21 @@
 </head>
 <body>
     <div class="header-controls">
-<select id="airlineSelect" onchange="updatePlaceholder()">
-    <option value="AC">Air Canada (AC)</option>
-    <option value="AF">Air France (AF)</option>
-    <option value="AS">Alaska Airlines (AS)</option>
-    <option value="G4">Allegiant Air (G4)</option>
-    <option value="AA">American Airlines (AA)</option>
-    <option value="BA">British Airways (BA)</option>
-    <option value="DL">Delta Air Lines (DL)</option>
-    <option value="F9">Frontier Airlines (F9)</option>
-    <option value="KL">KLM (KL)</option>
-    <option value="LH">Lufthansa (LH)</option>
-    <option value="WN">Southwest Airlines (WN)</option>
-    <option value="UA">United Airlines (UA)</option>
-    <option value="PRIVATE">Private (N-Number)</option>
-</select>
+        <select id="airlineSelect" onchange="updatePlaceholder()">
+            <option value="AC">Air Canada (AC)</option>
+            <option value="AF">Air France (AF)</option>
+            <option value="AS">Alaska Airlines (AS)</option>
+            <option value="G4">Allegiant Air (G4)</option>
+            <option value="AA">American Airlines (AA)</option>
+            <option value="BA">British Airways (BA)</option>
+            <option value="DL">Delta Air Lines (DL)</option>
+            <option value="F9">Frontier Airlines (F9)</option>
+            <option value="KL">KLM (KL)</option>
+            <option value="LH">Lufthansa (LH)</option>
+            <option value="WN">Southwest Airlines (WN)</option>
+            <option value="UA">United Airlines (UA)</option>
+            <option value="PRIVATE">Private (N-Number)</option>
+        </select>
         <input type="text" id="flightNum" placeholder="Flight Number (e.g. 3748)">
         <button onclick="trackFlight()">TRACK</button>
         <button onclick="clearAll()">CLEAR</button>
@@ -46,18 +46,15 @@
 
         function updatePlaceholder() {
             const type = document.getElementById('airlineSelect').value;
-            const input = document.getElementById('flightNum');
-            input.placeholder = (type === 'PRIVATE') ? "Enter Tail (e.g. N123AK)" : "Flight Number (e.g. 3748)";
+            document.getElementById('flightNum').placeholder = (type === 'PRIVATE') ? "Enter Tail (e.g. N123AK)" : "Flight Number (e.g. 3748)";
         }
 
         async function trackFlight() {
             const type = document.getElementById('airlineSelect').value;
             const number = document.getElementById('flightNum').value.trim();
             if (!number) return;
-            
             const identifier = (type === 'PRIVATE') ? number : (type + number);
             let flights = JSON.parse(localStorage.getItem('myFlights') || '[]');
-            
             if (!flights.find(f => f.id === identifier)) {
                 flights.push({ id: identifier, type: type });
                 localStorage.setItem('myFlights', JSON.stringify(flights));
@@ -70,12 +67,12 @@
             const board = document.getElementById('flightBoard');
             const flightList = JSON.parse(localStorage.getItem('myFlights') || '[]');
             board.innerHTML = '';
-            
             for (const item of flightList) {
                 try {
                     const res = await fetch(`${PROXY_URL}?flight=${item.id}&type=${item.type}`);
                     const data = await res.json();
-                    if (data && data.length > 0) {
+                    console.log(`Debug Data for ${item.id}:`, data); // Check console for raw API response
+                    if (Array.isArray(data) && data.length > 0) {
                         data.forEach(leg => renderRow(leg, item.id));
                     }
                 } catch(e) { console.error("Refresh error:", e); }
@@ -83,32 +80,23 @@
         }
 
         function renderRow(f, id) {
+            const status = f.status || 'Unknown';
             const sched = f.arrival?.scheduledTime?.local ? new Date(f.arrival.scheduledTime.local.replace(' ', 'T')) : new Date();
             const eta = f.arrival?.predictedTime?.local ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
             const origin = f.departure?.airport?.iata || "---";
             
-            // Logic for status
+            // Flexible status logic
+            const flyingKeywords = ['Active', 'EnRoute', 'InFlight', 'Departed'];
+            const isInAir = flyingKeywords.includes(status);
             const isDelayed = eta > sched;
-            const status = f.status; // 'Active', 'Scheduled', 'Landed', etc.
             
-            // Determine status text
             let statusText = isDelayed ? 'DELAYED' : 'ON TIME';
-            
-            if (status === 'Active') {
-                // If the flight is active but hasn't updated its progress significantly
-                // we can label it TAXIING / DEPARTED
-                statusText = isDelayed ? 'DELAYED - IN THE AIR' : 'IN THE AIR';
-            } else if (status === 'Scheduled') {
-                // If it's still "Scheduled" but we are near the departure time, it's TAXIING
-                statusText = isDelayed ? 'DELAYED - ON THE GROUND' : 'ON THE GROUND';
-            } else if (status === 'Landed') {
-                statusText = 'LANDED';
-            }
-            
+            if (isInAir) statusText = isDelayed ? 'DELAYED - IN THE AIR' : 'IN THE AIR';
+            else if (status === 'Scheduled' || status === 'Unknown') statusText = isDelayed ? 'DELAYED - ON THE GROUND' : 'ON THE GROUND';
+            else if (status === 'Landed') statusText = 'LANDED';
+
             const parentFlight = f.codeshareFlightNumber ? `<small>(Op: ${f.codeshareFlightNumber})</small>` : "";
-            const fmt = (d) => d.toLocaleTimeString('en-US', { 
-                timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false 
-            });
+            const fmt = (d) => d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false });
             
             document.getElementById('flightBoard').innerHTML += `
                 <div class="flight-row" style="color: ${isDelayed ? '#f87171' : '#fff'}">
