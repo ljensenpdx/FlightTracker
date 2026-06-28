@@ -68,7 +68,7 @@
             }
         }
 
-        function renderRow(f, num) {
+function renderRow(f, num) {
             const sched = new Date(f.arrival.scheduledTime.local.replace(' ', 'T'));
             const eta = f.arrival.predictedTime ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
             
@@ -80,8 +80,7 @@
             document.getElementById('flightBoard').innerHTML += `
                 <div class="flight-row" style="color: ${isDelayed ? '#f87171' : '#fff'}">
                     <div class="flap">${num}</div>
-                    <div class="flap">${f.airline.name}</div>
-                    <div class="flap">${fmt(sched)}</div>
+                    <div class="flap">${f.departure.airport.iata}</div> <div class="flap">${fmt(sched)}</div>
                     <div class="flap">${fmt(eta)}</div>
                     <div class="flap">${isDelayed ? 'DELAYED' : 'ON TIME'}</div>
                 </div>`;
