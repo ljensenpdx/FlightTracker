@@ -87,21 +87,36 @@
             const eta = f.arrival?.predictedTime?.local ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
             const origin = f.departure?.airport?.iata || "---";
             
-            // Check for codeshare parent flight
-            const parentFlight = f.codeshareFlightNumber ? `<small>(Op: ${f.codeshareFlightNumber})</small>` : "";
+            // Logic for status
+            const isDelayed = eta > sched;
+            const status = f.status; // 'Active', 'Scheduled', 'Landed', etc.
             
+            // Determine status text
+            let statusText = isDelayed ? 'DELAYED' : 'ON TIME';
+            
+            if (status === 'Active') {
+                // If the flight is active but hasn't updated its progress significantly
+                // we can label it TAXIING / DEPARTED
+                statusText = isDelayed ? 'DELAYED - IN THE AIR' : 'IN THE AIR';
+            } else if (status === 'Scheduled') {
+                // If it's still "Scheduled" but we are near the departure time, it's TAXIING
+                statusText = isDelayed ? 'DELAYED - ON THE GROUND' : 'ON THE GROUND';
+            } else if (status === 'Landed') {
+                statusText = 'LANDED';
+            }
+            
+            const parentFlight = f.codeshareFlightNumber ? `<small>(Op: ${f.codeshareFlightNumber})</small>` : "";
             const fmt = (d) => d.toLocaleTimeString('en-US', { 
                 timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false 
             });
             
-            const isDelayed = eta > sched;
             document.getElementById('flightBoard').innerHTML += `
                 <div class="flight-row" style="color: ${isDelayed ? '#f87171' : '#fff'}">
                     <div class="flap">${id}${parentFlight}</div>
                     <div class="flap">${origin}</div>
                     <div class="flap">${fmt(sched)}</div>
                     <div class="flap">${fmt(eta)}</div>
-                    <div class="flap">${isDelayed ? 'DELAYED' : 'ON TIME'}</div>
+                    <div class="flap">${statusText}</div>
                 </div>`;
         }
 
