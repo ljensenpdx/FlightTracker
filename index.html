@@ -17,24 +17,21 @@
 </head>
 <body>
     <div class="header-controls">
-        <select id="airlineSelect" onchange="updatePlaceholder()">
-            <optgroup label="Global Alliances & International">
-                <option value="AA">American (AA)</option>
-                <option value="DL">Delta (DL)</option>
-                <option value="UA">United (UA)</option>
-                <option value="AF">Air France (AF)</option>
-                <option value="KL">KLM (KL)</option>
-                <option value="LH">Lufthansa (LH)</option>
-                <option value="BA">British Airways (BA)</option>
-                <option value="AC">Air Canada (AC)</option>
-            </optgroup>
-            <optgroup label="Other Carriers">
-                <option value="WN">Southwest (WN)</option>
-                <option value="AS">Alaska (AS)</option>
-                <option value="F9">Frontier (F9)</option>
-            </optgroup>
-            <option value="PRIVATE">Private (N-Number)</option>
-        </select>
+<select id="airlineSelect" onchange="updatePlaceholder()">
+    <option value="AC">Air Canada (AC)</option>
+    <option value="AF">Air France (AF)</option>
+    <option value="AS">Alaska Airlines (AS)</option>
+    <option value="G4">Allegiant Air (G4)</option>
+    <option value="AA">American Airlines (AA)</option>
+    <option value="BA">British Airways (BA)</option>
+    <option value="DL">Delta Air Lines (DL)</option>
+    <option value="F9">Frontier Airlines (F9)</option>
+    <option value="KL">KLM (KL)</option>
+    <option value="LH">Lufthansa (LH)</option>
+    <option value="WN">Southwest Airlines (WN)</option>
+    <option value="UA">United Airlines (UA)</option>
+    <option value="PRIVATE">Private (N-Number)</option>
+</select>
         <input type="text" id="flightNum" placeholder="Flight Number (e.g. 3748)">
         <button onclick="trackFlight()">TRACK</button>
         <button onclick="clearAll()">CLEAR</button>
