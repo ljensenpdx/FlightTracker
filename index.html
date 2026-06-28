@@ -5,91 +5,89 @@
     <title>Live Flight Board</title>
     <style>
         body { background-color: #111; color: #fff; font-family: 'Courier New', monospace; padding: 2rem; margin: 0; }
-        .header-controls { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-        input { padding: 10px; background: #222; border: 1px solid #444; color: white; text-transform: uppercase; }
-        button { padding: 10px 20px; font-family: inherit; border: 1px solid #444; background-color: #333; color: white; cursor: pointer; text-transform: uppercase; margin-left: 5px; }
-        button:hover { background-color: #555; }
-        .board-header, .flight-row { display: grid; grid-template-columns: 1.2fr 1.2fr 1.5fr 1.5fr 2fr; gap: 3.5rem; padding: 12px 20px; align-items: center; }
-        .board-header { color: #666; border-bottom: 2px solid #222; }
-        .flight-row { font-size: 1.6rem; font-weight: bold; background-color: #050505; margin-top: 8px; border: 1px solid #1a1a1a; }
-        .flap { background: linear-gradient(to bottom, #222 0%, #151515 50%, #111 50%, #1a1a1a 100%); padding: 8px 14px; border-radius: 4px; text-align: center; }
-        .text-green .flap { color: #4ade80; } .text-yellow .flap { color: #facc15; } .text-red .flap { color: #f87171; } .text-white .flap { color: #ffffff; }
+        .header-controls { margin-bottom: 2rem; display: flex; gap: 10px; align-items: center; }
+        select, input { padding: 10px; background: #222; border: 1px solid #444; color: white; }
+        button { padding: 10px 20px; background-color: #333; color: white; border: 1px solid #444; cursor: pointer; text-transform: uppercase; }
+        .board-header, .flight-row { display: grid; grid-template-columns: 1fr 1fr 1.5fr 1.5fr 2fr; gap: 2rem; padding: 12px 20px; align-items: center; }
+        .board-header { color: #666; border-bottom: 2px solid #222; font-size: 0.9rem; text-transform: uppercase; }
+        .flight-row { background-color: #050505; margin-top: 8px; border: 1px solid #1a1a1a; font-size: 1.4rem; }
+        .flap { background: #222; padding: 8px; border-radius: 4px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="header-controls">
-        <h2>ARRIVAL BOARD (CT)</h2>
-        <div>
-            <input type="text" id="newFlight" placeholder="Enter Flight">
-            <button onclick="trackFlight()">TRACK</button>
-            <button onclick="clearAll()">CLEAR ALL</button>
-            <button onclick="refreshBoard()">REFRESH</button>
-        </div>
+        <select id="airlineSelect">
+            <option value="AA">American (AA)</option>
+            <option value="WN">Southwest (WN)</option>
+            <option value="UA">United (UA)</option>
+            <option value="DL">Delta (DL)</option>
+            <option value="AS">Alaska (AS)</option>
+            <option value="B6">JetBlue (B6)</option>
+        </select>
+        <input type="text" id="flightNum" placeholder="Flight Number (e.g. 3748)">
+        <button onclick="trackFlight()">TRACK MCI ARRIVAL</button>
+        <button onclick="clearAll()">CLEAR</button>
+        <button onclick="refreshBoard()">REFRESH</button>
     </div>
-    <div class="board-header"><div>Flight</div><div>Origin</div><div>Scheduled</div><div>ETA</div><div>Remarks</div></div>
+
+    <div class="board-header"><div>Flight</div><div>Airline</div><div>Scheduled</div><div>ETA</div><div>Status</div></div>
     <div id="flightBoard"></div>
 
     <script>
-        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxqVMHIPFaD-0GGdZYRal2Vd_Lwsa4tG4HvDw1H3cn6UR3pSphMlpT8EZctt_ZtfXKIAQ/exec';
+        const PROXY_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
 
         async function trackFlight() {
-            const input = document.getElementById('newFlight');
-            const flight = input.value.toUpperCase().trim();
-            if (!flight) return;
+            const airline = document.getElementById('airlineSelect').value;
+            const number = document.getElementById('flightNum').value.trim();
+            if (!number) return;
             
+            const fullFlight = airline + number;
             let flights = JSON.parse(localStorage.getItem('myFlights') || '[]');
-            if (!flights.includes(flight)) {
-                flights.push(flight);
+            
+            if (!flights.includes(fullFlight)) {
+                flights.push(fullFlight);
                 localStorage.setItem('myFlights', JSON.stringify(flights));
             }
-            input.value = '';
+            document.getElementById('flightNum').value = '';
             await refreshBoard();
-        }
-
-        function clearAll() {
-            localStorage.removeItem('myFlights');
-            document.getElementById('flightBoard').innerHTML = '';
         }
 
         async function refreshBoard() {
             const board = document.getElementById('flightBoard');
             const flightList = JSON.parse(localStorage.getItem('myFlights') || '[]');
-            board.innerHTML = 'Updating...';
-
-            for (const flightNum of flightList) {
+            board.innerHTML = '';
+            
+            for (const f of flightList) {
                 try {
-                    // Added await here to fix the Promise pending issue
-                    const response = await fetch(`${PROXY_URL}?flight=${flightNum}`);
-                    const data = await response.json();
-                    
+                    const res = await fetch(`${PROXY_URL}?flight=${f}`);
+                    const data = await res.json();
                     if (data && data.length > 0) {
-                        renderFlightRow(data[0].details, flightNum);
+                        data.forEach(leg => renderRow(leg, f));
                     }
-                } catch (e) { console.error("Fetch error:", e); }
+                } catch(e) { console.error("Refresh error:", e); }
             }
-            if(flightList.length === 0) board.innerHTML = '';
         }
 
-        function renderFlightRow(flight, flightNum) {
-            const scheduled = new Date(flight.arrival.scheduledTime.local.replace(' ', 'T'));
-            const eta = flight.arrival.predictedTime ? new Date(flight.arrival.predictedTime.local.replace(' ', 'T')) : scheduled;
+        function renderRow(f, num) {
+            const sched = new Date(f.arrival.scheduledTime.local.replace(' ', 'T'));
+            const eta = f.arrival.predictedTime ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
             
-            const format = (d) => d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false });
+            const fmt = (d) => d.toLocaleTimeString('en-US', { 
+                timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false 
+            });
             
-            const diff = (eta - scheduled) / 60000;
-            let status = diff < -1 ? 'text-green' : (diff > 1 ? 'text-yellow' : 'text-white');
-            let remark = diff < -1 ? 'EARLY' : (diff > 1 ? 'DELAYED' : 'ON TIME');
-
-            const board = document.getElementById('flightBoard');
-            board.innerHTML += `
-                <div class="flight-row ${status}">
-                    <div class="flap">${flightNum}</div>
-                    <div class="flap">${flight.departure.airport.iata}</div>
-                    <div class="flap">${format(scheduled)}</div>
-                    <div class="flap">${format(eta)}</div>
-                    <div class="flap">${remark}</div>
+            const isDelayed = eta > sched;
+            document.getElementById('flightBoard').innerHTML += `
+                <div class="flight-row" style="color: ${isDelayed ? '#f87171' : '#fff'}">
+                    <div class="flap">${num}</div>
+                    <div class="flap">${f.airline.name}</div>
+                    <div class="flap">${fmt(sched)}</div>
+                    <div class="flap">${fmt(eta)}</div>
+                    <div class="flap">${isDelayed ? 'DELAYED' : 'ON TIME'}</div>
                 </div>`;
         }
+
+        function clearAll() { localStorage.removeItem('myFlights'); location.reload(); }
         window.onload = refreshBoard;
     </script>
 </body>
