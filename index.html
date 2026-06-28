@@ -12,17 +12,27 @@
         .board-header { color: #666; border-bottom: 2px solid #222; font-size: 0.9rem; text-transform: uppercase; }
         .flight-row { background-color: #050505; margin-top: 8px; border: 1px solid #1a1a1a; font-size: 1.4rem; }
         .flap { background: #222; padding: 8px; border-radius: 4px; text-align: center; }
+        small { display: block; font-size: 0.8rem; color: #888; margin-top: 4px; }
     </style>
 </head>
 <body>
     <div class="header-controls">
         <select id="airlineSelect" onchange="updatePlaceholder()">
-            <option value="AA">American (AA)</option>
-            <option value="WN">Southwest (WN)</option>
-            <option value="UA">United (UA)</option>
-            <option value="DL">Delta (DL)</option>
-            <option value="AS">Alaska (AS)</option>
-            <option value="B6">JetBlue (B6)</option>
+            <optgroup label="Global Alliances & International">
+                <option value="AA">American (AA)</option>
+                <option value="DL">Delta (DL)</option>
+                <option value="UA">United (UA)</option>
+                <option value="AF">Air France (AF)</option>
+                <option value="KL">KLM (KL)</option>
+                <option value="LH">Lufthansa (LH)</option>
+                <option value="BA">British Airways (BA)</option>
+                <option value="AC">Air Canada (AC)</option>
+            </optgroup>
+            <optgroup label="Other Carriers">
+                <option value="WN">Southwest (WN)</option>
+                <option value="AS">Alaska (AS)</option>
+                <option value="F9">Frontier (F9)</option>
+            </optgroup>
             <option value="PRIVATE">Private (N-Number)</option>
         </select>
         <input type="text" id="flightNum" placeholder="Flight Number (e.g. 3748)">
@@ -31,7 +41,7 @@
         <button onclick="refreshBoard()">REFRESH</button>
     </div>
 
-    <div class="board-header"><div>ID</div><div>Origin</div><div>Scheduled</div><div>ETA</div><div>Status</div></div>
+    <div class="board-header"><div>Flight</div><div>Origin</div><div>Scheduled</div><div>ETA</div><div>Status</div></div>
     <div id="flightBoard"></div>
 
     <script>
@@ -51,9 +61,8 @@
             const identifier = (type === 'PRIVATE') ? number : (type + number);
             let flights = JSON.parse(localStorage.getItem('myFlights') || '[]');
             
-            const entry = { id: identifier, type: type };
             if (!flights.find(f => f.id === identifier)) {
-                flights.push(entry);
+                flights.push({ id: identifier, type: type });
                 localStorage.setItem('myFlights', JSON.stringify(flights));
             }
             document.getElementById('flightNum').value = '';
@@ -77,10 +86,12 @@
         }
 
         function renderRow(f, id) {
-            // Handle differences in JSON structure for Private vs Commercial
             const sched = f.arrival?.scheduledTime?.local ? new Date(f.arrival.scheduledTime.local.replace(' ', 'T')) : new Date();
             const eta = f.arrival?.predictedTime?.local ? new Date(f.arrival.predictedTime.local.replace(' ', 'T')) : sched;
             const origin = f.departure?.airport?.iata || "---";
+            
+            // Check for codeshare parent flight
+            const parentFlight = f.codeshareFlightNumber ? `<small>(Op: ${f.codeshareFlightNumber})</small>` : "";
             
             const fmt = (d) => d.toLocaleTimeString('en-US', { 
                 timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false 
@@ -89,7 +100,7 @@
             const isDelayed = eta > sched;
             document.getElementById('flightBoard').innerHTML += `
                 <div class="flight-row" style="color: ${isDelayed ? '#f87171' : '#fff'}">
-                    <div class="flap">${id}</div>
+                    <div class="flap">${id}${parentFlight}</div>
                     <div class="flap">${origin}</div>
                     <div class="flap">${fmt(sched)}</div>
                     <div class="flap">${fmt(eta)}</div>
